@@ -36,8 +36,8 @@ class ParserProducts:
     async def main(self):
         tasks = []
         async with aiohttp.ClientSession(headers=self.headers) as session:
-            for i in range(1, self.get_pages(self.get_soup(self.url))):
-                task = asyncio.create_task(self.pars(f'{self.url}&page{i}', session))
+            for i in range(1, self.get_pages(self.get_soup(self.url)) + 1):
+                task = asyncio.create_task(self.pars(f'{self.url}&page={i}', session))
                 tasks.append(task)
             await asyncio.gather(*tasks)
 
