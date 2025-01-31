@@ -11,7 +11,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.common.exceptions import NoAlertPresentException, NoSuchElementException, \
     ElementClickInterceptedException, TimeoutException
-from cookies import cookies
+from magnit_selenium import cookies
 
 options = webdriver.ChromeOptions()
 service = Service(executable_path=ChromeDriverManager().install())
