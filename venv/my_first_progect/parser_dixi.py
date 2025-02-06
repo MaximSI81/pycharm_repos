@@ -9,11 +9,13 @@ import time
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
-from selenium.common.exceptions import ElementNotInteractableException, ElementClickInterceptedException
+from selenium.common.exceptions import (ElementNotInteractableException, ElementClickInterceptedException,
+                                        NoSuchElementException)
 import csv
 import random
 from selenium import webdriver
 from seleniumwire import webdriver
+import pandas as pd
 
 
 class ParserDixi:
@@ -48,12 +50,13 @@ class ParserDixi:
         options = webdriver.ChromeOptions()
         options.page_load_strategy = 'eager'
         service = Service(executable_path=ChromeDriverManager().install())
-        options.add_argument('--headless')
-        options.add_argument('--disable-gpu')
+        #options.add_argument('--headless')
+        #options.add_argument('--disable-gpu')
         driver = webdriver.Chrome(service=service, options=options, seleniumwire_options=proxi_options)
         driver.implicitly_wait(5)
         with driver as browser:
             browser.get(link)
+            time.sleep(15)
             with open('cookies_dixi.json', 'r') as file:
                 cookies = json.load(file)
                 for cookie in cookies:
@@ -63,20 +66,20 @@ class ParserDixi:
             while True:
                 try:
                     browser.find_element(By.XPATH, "//button[@class='btn grey more-orders']").click()
-                except ElementNotInteractableException:
+                except (ElementNotInteractableException, NoSuchElementException):
                     break
             html = browser.page_source
             if html:
                 soup = BeautifulSoup(html, 'lxml')
-
                 for t in soup.find_all('article', class_='card bs-state'):
-                    for firm in self.trademark:
-                        if self.get_trademark(firm, t.find('h3').text):
-                            if t.find('a'):
-                                try:
+                    if t.find('a'):
+                        try:
+                            for firm in self.trademark:
+                                if self.get_trademark(firm, t.find('h3').text):
                                     self.data.append(t.find('a')['href'])
-                                except AttributeError:
-                                    pass
+                                    print(t.find('a')['href'])
+                        except AttributeError:
+                            pass
 
     def get_link(self):
         x = -1
@@ -87,10 +90,13 @@ class ParserDixi:
                 self.pars(self.url + self.prod[x])
                 self.link += self.data
                 print(x)
+                print(len(self.link))
             except ElementClickInterceptedException:
                 x -= 1
+                print(len(self.link))
 
     def get_prod(self):
+        dict_name_column = {'Тип товара': 'Тип продукта',  'Торговая марка': 'Бренд'}
         self.get_link()
         session = requests.Session()
         for l in self.link:
@@ -101,21 +107,17 @@ class ParserDixi:
                     title = soup.find('h1').text
                     product_information = soup.find_all('div', class_='list__line')
                     l = []
-                    l.append('title' + ' ' + title)
                     price = soup.find('div', class_='card__price-num')
-                    l.append('price' + ' ' + price.text)
                     for i in product_information:
                         if i.find('span', class_='text').text in (
-                                'Торговая марка', 'Страна', 'Тип товара', 'Вид мяса', 'Вес', 'Вкус', 'Часть туши',
-                                'Вид овощей', 'Сорт', 'Тип упаковки', 'Срок хранения', 'Категория', 'Цвет',
-                                'Жирность',
-                                'Сорт колбасы', 'Фасовка', 'Способ обработки', 'Вид кофе', 'Сорт зерна', 'Вид чая',
-                                'Сорт чая', 'Ароматизатор'):
+                                'Тип товара', 'Торговая марка'):
                             if i.find('a'):
                                 l.append(
-                                    i.find('span', class_='text').text + ' ' + i.find('a').find('span').text)
+                                    dict_name_column[i.find('span', class_='text').text] + ' ' + i.find('a').find('span').text)
                             else:
                                 l.append(i.find('span', class_='text').text + ' ' + 'None')
+                    l.append('price' + ' ' + price.text)
+                    l.append('date_price' + ' ' + str(pd.to_datetime('today').normalize()))
                     self.prod_inf.append(l)
 
 
@@ -167,19 +169,20 @@ class ParserDixi:
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
         asyncio.run(self.main())
 '''
-prod = ['molochnye-produkty-yaytsa/', 'myaso-ptitsa/', 'myasnaya-gastronomiya/', 'ovoshchi-frukty/',
-        'konditerskie-izdeliya-torty/', 'chay-kofe-kakao/', 'voda-soki-napitki/', 'khleb-i-vypechka/']
+prod = ['molochnye-produkty-yaytsa/', 'konditerskie-izdeliya-torty/', 'ovoshchi-frukty/', 'khleb-i-vypechka/', 'myaso-ptitsa/', 'myasnaya-gastronomiya/', 'chay-kofe-kakao/']
 url = 'https://dixy.ru/catalog/'
-PD = ParserDixi(url, prod)
 
-PD.get_prod()
-for e, i in enumerate(PD.prod_inf):
-    print(e, '   ', i)
-with open('products.csv', 'w', encoding='utf-8') as f:
+data = []
+
+for p in prod:
+    PD = ParserDixi(url, [p])
+    PD.get_prod()
+    data += PD.prod_inf
+with open('products.csv', 'w', encoding='utf-8', newline='') as f:
     writer = csv.writer(f)
-    for row in PD.prod_inf:  # запись строк
+    for row in data:  # запись строк
         writer.writerow(row)
-print(len(PD.link))
+
 
 # Здесь происходит вход в систему для получения cookie
 '''driver.get('https://dixy.ru/')

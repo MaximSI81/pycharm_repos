@@ -5,10 +5,10 @@ from bs4 import BeautifulSoup
 from aiohttp_retry import RetryClient, ExponentialRetry
 from fake_useragent import UserAgent
 import csv
-import random
+import random, pandas
 from aiohttp_socks import ProxyType, ProxyConnector, ChainProxyConnector
-
-
+import datetime
+import pandas as pd
 class ParserProducts:
 
     def __init__(self, url):
@@ -23,12 +23,7 @@ class ParserProducts:
     @staticmethod
     def get_soup(url):
         print(url)
-        proxy = random.choice(
-            ['socks5h://hZdSqH:0SCocw@188.130.203.29:8000', 'socks5h://cLaFFB:JgGmZC@196.18.12.18:8000',
-             'socks5h://cLaFFB:JgGmZC@196.18.15.117:8000'])
-        proxies = {'http': proxy, 'https': proxy}
         session = requests.Session()
-        #session.proxies.update(proxies)
         resp = session.get(url=url, headers={'User-Agent': UserAgent().random})
         return BeautifulSoup(resp.text, 'lxml')
 
@@ -55,6 +50,8 @@ class ParserProducts:
                                                                class_='product-details-parameters-list__item'):
                                             t = tags.find_all('span', class_='pl-text')
                                             l.append(t[0].text + ' ' + t[1].text)
+                                        l.append('price' + ' ' + s.find('span', class_='pl-text product-details-price__current').text)
+                                        l.append('date_price' + ' ' + str(pd.to_datetime('today').normalize()))
                                         self.products.append(l)
 
     @staticmethod
@@ -65,10 +62,6 @@ class ParserProducts:
 
     async def main(self):
         tasks = []
-        connect = ChainProxyConnector.from_urls(
-            ['socks5://hZdSqH:0SCocw@188.130.203.29:8000', 'socks5://cLaFFB:JgGmZC@196.18.12.18:8000',
-             'socks5://cLaFFB:JgGmZC@196.18.15.117:8000'])
-        #timeout = aiohttp.ClientTimeout(total=.5, connect=0.1, sock_connect=0.1, sock_read=0.3)
         async with aiohttp.ClientSession() as session:
             for i in range(1, self.get_pages(self.get_soup(self.url)) + 1):
                 task = asyncio.create_task(self.pars(f'{self.url}&page={i}', session))
@@ -83,15 +76,17 @@ class ParserProducts:
 products = ['17591-sosiski_kolbasy_delikatesy', '4834-moloko_syr_yaytsa', '4884-ovoshchi_frukty',
             '4855-myaso_ptitsa_kolbasy', '5276-chay_kofe_kakao', '5011-sladosti_torty_pirozhnye', '5269-khleb_vypechka_sneki']
 
+data = []
 for i in products:
     p = ParserProducts(f'https://magnit.ru/catalog/{i}?shopCode=503051&shopType=1')
     p()
-    for e, i in enumerate(p.products):
-        print(e, '   ', i)
-    with open('products_magnit.csv', 'a+', encoding='utf-8', newline='') as f:
-        writer = csv.writer(f)
-        for row in p.products:  # запись строк
-            writer.writerow(row)
+    data += p.products
+
+
+with open('products_magnit.csv', 'w', encoding='utf-8', newline='') as f:
+    writer = csv.writer(f)
+for row in data:  # запись строк
+    writer.writerow(row)
 
 
 
