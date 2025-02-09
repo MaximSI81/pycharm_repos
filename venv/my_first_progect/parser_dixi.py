@@ -50,10 +50,10 @@ class ParserDixi:
         options = webdriver.ChromeOptions()
         options.page_load_strategy = 'eager'
         service = Service(executable_path=ChromeDriverManager().install())
-        #options.add_argument('--headless')
-        #options.add_argument('--disable-gpu')
+        # options.add_argument('--headless')
+        options.add_argument('--disable-gpu')
         driver = webdriver.Chrome(service=service, options=options, seleniumwire_options=proxi_options)
-        driver.implicitly_wait(5)
+        driver.implicitly_wait(10)
         with driver as browser:
             browser.get(link)
             time.sleep(15)
@@ -96,7 +96,7 @@ class ParserDixi:
                 print(len(self.link))
 
     def get_prod(self):
-        dict_name_column = {'Тип товара': 'Тип продукта',  'Торговая марка': 'Бренд'}
+        dict_name_column = {'Тип товара': 'Тип продукта', 'Торговая марка': 'Бренд'}
         self.get_link()
         session = requests.Session()
         for l in self.link:
@@ -113,9 +113,11 @@ class ParserDixi:
                                 'Тип товара', 'Торговая марка'):
                             if i.find('a'):
                                 l.append(
-                                    dict_name_column[i.find('span', class_='text').text] + ' ' + i.find('a').find('span').text)
+                                    dict_name_column[i.find('span', class_='text').text] + ' ' + i.find('a').find(
+                                        'span').text)
                             else:
                                 l.append(i.find('span', class_='text').text + ' ' + 'None')
+                    l.append('Название' + ' ' + title)
                     l.append('price' + ' ' + price.text)
                     l.append('date_price' + ' ' + str(pd.to_datetime('today').normalize()))
                     self.prod_inf.append(l)
@@ -169,7 +171,8 @@ class ParserDixi:
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
         asyncio.run(self.main())
 '''
-prod = ['molochnye-produkty-yaytsa/', 'konditerskie-izdeliya-torty/', 'ovoshchi-frukty/', 'khleb-i-vypechka/', 'myaso-ptitsa/', 'myasnaya-gastronomiya/', 'chay-kofe-kakao/']
+'''prod = ['molochnye-produkty-yaytsa/', 'konditerskie-izdeliya-torty/', 'ovoshchi-frukty/', 'khleb-i-vypechka/',
+        'myaso-ptitsa/', 'myasnaya-gastronomiya/', 'chay-kofe-kakao/']
 url = 'https://dixy.ru/catalog/'
 
 data = []
@@ -182,8 +185,7 @@ with open('products.csv', 'w', encoding='utf-8', newline='') as f:
     writer = csv.writer(f)
     for row in data:  # запись строк
         writer.writerow(row)
-
-
+'''
 # Здесь происходит вход в систему для получения cookie
 '''driver.get('https://dixy.ru/')
 driver = webdriver.Chrome()
@@ -241,3 +243,38 @@ for PROXY in proxy_list:
         print(_ex)
         continue
 '''
+
+
+def transformation(description_list, name_column):
+    data = []
+    for i in name_column:
+        for j in description_list[0].split(','):
+            if i in j:
+                data.append(j.replace(i, '').lstrip())
+    return data
+
+
+def parser_d():
+    prod = ['molochnye-produkty-yaytsa/', 'konditerskie-izdeliya-torty/', 'ovoshchi-frukty/', 'khleb-i-vypechka/',
+            'myaso-ptitsa/', 'myasnaya-gastronomiya/', 'chay-kofe-kakao/']
+    pr = ['molochnye-produkty-yaytsa/']
+    url = 'https://dixy.ru/catalog/'
+    data = []
+    for p in pr:
+        PD = ParserDixi(url, [p])
+        PD.get_prod()
+        data += PD.prod_inf
+    name_column = ['Название', 'Тип продукта', 'Бренд', 'price', 'date_price']
+    df = pd.DataFrame(columns=name_column)
+    x = 0
+    for i in data:
+        data_list = transformation([','.join(i)], name_column)
+        if data_list:
+            try:
+                df.loc[x] = transformation([','.join(i)], name_column)[:-1]
+                x += 1
+            except ValueError:
+                pass
+    return df
+
+print(parser_d())
